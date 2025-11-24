@@ -29,6 +29,32 @@ async function run() {
 
     //cars apis here:)
 
+    //get all cars data from db
+    app.get("/cars", async (req, res) => {
+      try {
+        const query = {};
+        const result = await carsCollection.find(query).toArray()
+        res.send(result);
+      } catch {
+        res.status(500).send({ message: "Failed to fetch cars" });
+      }
+    });
+
+    //add to db
+    app.post("/cars", async (req, res) => {
+      try {
+        const car = req.body;
+        const newCar = {
+          ...car,
+          created_at: new Date(),
+        };
+        const result = await carsCollection.insertOne(newCar);
+        res.send(result);
+      } catch {
+        res.status(500).send({ message: "Failed to add car" });
+      }
+    });
+
     console.log("Connected to MongoDB!");
   } catch (err) {
     console.error("MongoDB connection failed:", err.message);
