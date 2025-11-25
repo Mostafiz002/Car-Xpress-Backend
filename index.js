@@ -8,6 +8,26 @@ const { MongoClient, ServerApiVersion } = require("mongodb");
 app.use(express.json());
 app.use(cors());
 
+//verify firebase token
+const verifyFirebaseToken = async (req, res, next) => {
+  if (!req.headers.authorization) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = req.headers.authorization.split(" ")[1];
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+
+  try {
+    const userInfo = await admin.auth().verifyIdToken(token);
+    req.token_email = userInfo.email;
+    console.log("after token validation ", userInfo);
+    next();
+  } catch {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+};
+
 //port and clients
 const port = process.env.PORT || 5000;
 const uri = process.env.URI;
@@ -32,8 +52,15 @@ async function run() {
     //get all cars data from db
     app.get("/cars", async (req, res) => {
       try {
-        const query = {};
-        const result = await carsCollection.find(query).toArray()
+        const { limit } = req.query;
+
+        let cursor = carsCollection.find().sort({ created_at: -1 });
+
+        if (limit) {
+          cursor = cursor.limit(parseInt(limit));
+        }
+
+        const result = await cursor.toArray();
         res.send(result);
       } catch {
         res.status(500).send({ message: "Failed to fetch cars" });
@@ -41,7 +68,7 @@ async function run() {
     });
 
     //add to db
-    app.post("/cars", async (req, res) => {
+    app.post("/cars", verifyFirebaseToken, async (req, res) => {
       try {
         const car = req.body;
         const newCar = {
