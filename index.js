@@ -61,12 +61,23 @@ async function run() {
       try {
         const { limit, search } = req.query;
         let query = {};
+        const options = {
+          projection: {
+            created_at: 0,
+            shortDescription: 0,
+            userName: 0,
+            userEmail: 0,
+            phone: 0,
+          },
+        };
 
         if (search) {
           query.brand = { $regex: search, $options: "i" };
         }
 
-        let cursor = carsCollection.find(query).sort({ created_at: -1 });
+        let cursor = carsCollection
+          .find(query, options)
+          .sort({ created_at: -1 });
 
         if (limit) {
           cursor = cursor.limit(parseInt(limit));
@@ -84,7 +95,13 @@ async function run() {
       try {
         const id = req.params.id;
         const query = { _id: new ObjectId(id) };
-        const result = await carsCollection.findOne(query);
+        const options = {
+          projection: {
+            created_at: 0,
+          },
+        };
+
+        const result = await carsCollection.findOne(query, options);
         res.send(result);
       } catch {
         res.status(500).send({ message: "Failed to fetch car" });
@@ -100,8 +117,16 @@ async function run() {
           return res.status(400).send({ message: "Email is required" });
         }
 
+        const options = {
+          projection: {
+            title: 1,
+            brand: 1,
+            image: 1,
+          },
+        };
+
         const query = { userEmail: email };
-        const result = await carsCollection.find(query).toArray();
+        const result = await carsCollection.find(query, options).toArray();
         res.send(result);
       } catch {
         res.status(500).send({ message: "Failed to fetch cars" });
@@ -109,13 +134,27 @@ async function run() {
     });
 
     //api for add car data to db
+
+    const MAX_CARS = 5;
+
     app.post("/cars", verifyFirebaseToken, async (req, res) => {
       try {
-        const car = req.body;
+        const { userEmail, ...car } = req.body;
+
+        const count = await carsCollection.countDocuments({ userEmail });
+
+        if (count >= MAX_CARS) {
+          return res.status(429).send({
+            message: "Maximum 5 cars allowed",
+          });
+        }
+
         const newCar = {
           ...car,
+          userEmail,
           created_at: new Date(),
         };
+
         const result = await carsCollection.insertOne(newCar);
         res.send(result);
       } catch {
