@@ -2,7 +2,14 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const admin = require("firebase-admin");
+
+const serviceAccount = require("./car-xpress-firebase-admin-sdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 //middleware
 app.use(express.json());
@@ -52,9 +59,14 @@ async function run() {
     //get all cars data from db
     app.get("/cars", async (req, res) => {
       try {
-        const { limit } = req.query;
+        const { limit, search } = req.query;
+        let query = {};
 
-        let cursor = carsCollection.find().sort({ created_at: -1 });
+        if (search) {
+          query.brand = { $regex: search, $options: "i" };
+        }
+
+        let cursor = carsCollection.find(query).sort({ created_at: -1 });
 
         if (limit) {
           cursor = cursor.limit(parseInt(limit));
@@ -67,7 +79,19 @@ async function run() {
       }
     });
 
-    //add to db
+    //api for single car data
+    app.get("/cars/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await carsCollection.findOne(query);
+        res.send(result);
+      } catch {
+        res.status(500).send({ message: "Failed to fetch car" });
+      }
+    });
+
+    //api for add car data to db
     app.post("/cars", verifyFirebaseToken, async (req, res) => {
       try {
         const car = req.body;
