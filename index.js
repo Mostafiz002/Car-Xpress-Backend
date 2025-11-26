@@ -123,6 +123,18 @@ async function run() {
       }
     });
 
+    // delete api
+    app.delete("/cars/:id", verifyFirebaseToken, async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await carsCollection.deleteOne(query);
+        res.send(result);
+      } catch {
+        res.status(500).send({ message: "Failed to add car" });
+      }
+    });
+
     console.log("Connected to MongoDB!");
   } catch (err) {
     console.error("MongoDB connection failed:", err.message);
